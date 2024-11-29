@@ -41,19 +41,44 @@ app.post("/template", async (req, res) => {
       ],
       uiPrompt: [reactBasePrompt],
     });
-  }
-  if (answer == "node" || answer == "Node") {
+  } else if (answer == "node" || answer == "Node") {
     res.json({
       prompts: [
         `Here is an artifact that contains all files of the project visible to you.\nConsider the contents of ALL files in the project.\n\n${nodeBasePrompt}\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - .gitignore\n  - package-lock.json\n`,
       ],
       uiPrompt: [nodeBasePrompt],
     });
+  } else {
+    res.status(403).json({
+      error:
+        "Invalid response from LLM as template is not supported or wrong response from LLM",
+    });
+  }
+});
+
+// route to get the chat response from the LLM to generate the actual ui code according to the user prompt
+app.post("/chat", async (req, res) => {
+  const messages = req.body.messages;
+  const response = await groq.chat.completions.create({
+    messages: [
+      {
+        role: "system",
+        content: getSystemPrompt(),
+      },
+      { role: "user", content: JSON.stringify(messages) },
+    ],
+    model: "llama3-8b-8192",
+    stream: true,
+  });
+
+  // ! This is optional part , creating it just for the sake of streaming otherwise it is not needed.
+  let result = "";
+  for await (const chunk of response) {
+    result += chunk.choices[0]?.delta?.content || ""; // to write the response to the console without a new line
   }
 
-  res.status(403).json({
-    error:
-      "Invalid response from LLM as template is not supported or wrong response from LLM",
+  res.json({
+    response: result,
   });
 });
 
